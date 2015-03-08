@@ -18,13 +18,6 @@ struct Module {
   owner: String,
 }
 
-fn bind<'a, R, T, F: Fn(T) -> Result<R, &'a Error>>(m: Result<T, &'a Error>, f: F) -> Result<R, &'a Error> {
-  match m {
-    Ok(r) => f(r),
-    Err(e) => Err(e),
-  }
-}
-
 fn get(url: &str) -> Result<hyper::client::Response, Box<Error>> {
   let mut client = Client::new();
   let the_url = hyper::client::IntoUrl::into_url(url);
