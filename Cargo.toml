@@ -3,5 +3,7 @@
 name = "rustrix"
 version = "0.0.1"
 authors = ["Benjamin Malley <benjamin.malley@gmail.com>"]
-[dependencies]
-hyper = "0.2.0"
+[dependencies.hyper]
+git = "https://github.com/hyperium/hyper.git"
+[dependencies.url]
+git = "https://github.com/servo/rust-url.git"
