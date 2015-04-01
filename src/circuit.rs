@@ -16,5 +16,9 @@ impl Circuit {
   pub fn open(&mut self) {
     self.open = true;
   }
+
+  pub fn is_open(&self) -> bool {
+    self.open
+  }
 }
 

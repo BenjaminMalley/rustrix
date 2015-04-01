@@ -8,7 +8,7 @@ use error;
 use std::time::duration::Duration;
 use std::thread;
 use std::sync::mpsc::channel;
-use std::old_io::timer;
+use std::old_io::timer::Timer;
 
 pub struct Client {
   circuits: BTreeMap<String, circuit::Circuit>,
@@ -23,8 +23,7 @@ impl Client {
     }
   }
 
-  pub fn get(&mut self, url: &str) -> Result<client::Response, Box<Error>> {
-    let mut client = client::Client::new();
+  pub fn get(&mut self, url: &str) -> Result<hyper::client::response::Response, Box<Error>> {
     let valid_url = try!(client::IntoUrl::into_url(url));
     let host = match valid_url.host() {
       Some(host) => host.serialize(),
@@ -32,7 +31,7 @@ impl Client {
         return Err(box error::ClientError::InvalidHostname);
       }
     };
-    let circuit = match self.circuits.get(&host) {
+    let mut circuit = match self.circuits.get_mut(&host) {
       Some(circuit) => circuit,
       None => {
         return Err(box error::ClientError::HostNotFound(host));
@@ -40,29 +39,34 @@ impl Client {
     };
     if circuit.is_open() {
       let (tx, rx) = channel();
-      let tx2 = tx.clone();
-      let request = client.get(valid_url);
-      thread::spawn(|| {
-        let res = match request.send() {
+      thread::spawn(move || {
+        let mut client = client::Client::new();
+        let request = client.get(valid_url);
+        tx.send(match request.send() {
           Err(e) => Err(box e),
           Ok(x) => Ok(x),
-        };
-        tx.send(res);
+        });
       });
+      let mut timer = Timer::new().unwrap();
+      let timeout = timer.oneshot(self.timeout);
 
-      thread::spawn(move || {
-        timer::sleep(self.timeout);
-        circuit.close();
-        tx2.send(Err(box Client::RequestTimeout));
-      });
-
-      match rx.recv() {
-        Ok(x) => x,
-        Err(e) => Err(box e),
+      select! {
+        msg = rx.recv() => {
+          match msg {
+            Ok(resp) => return match resp {
+              Ok(r) => Ok(r),
+              Err(e) => Err(box error::ClientError::HttpClientError),
+            },
+            Err(e) => return Err(box e),
+          };
+        },
+        _ = timeout.recv() => {
+          circuit.close();
+          return Err(box error::ClientError::RequestTimeout);
+        }
       }
-
     } else {
-      Err(box error::ClientError::CircuitClosed);
+      return Err(box error::ClientError::CircuitClosed);
     }
   }
 

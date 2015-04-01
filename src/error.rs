@@ -1,11 +1,14 @@
 use std::error::Error;
 use std::fmt;
 
+
+#[derive(Debug)]
 pub enum ClientError {
   HostNotFound(String),
   InvalidHostname,
   CircuitClosed,
   RequestTimeout,
+  HttpClientError,
 }
 
 impl fmt::Display for ClientError {
@@ -21,6 +24,7 @@ impl Error for ClientError {
       ClientError::InvalidHostname => "Invalid Hostname",
       ClientError::CircuitClosed => "Circuit is Closed",
       ClientError::RequestTimeout => "Request timed out",
+      ClientError::HttpClientError => "Http Client Error",
     }
   }
 
