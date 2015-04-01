@@ -2,6 +2,7 @@
 #![feature(box_syntax)]
 #![feature(std_misc)]
 #![feature(old_io)]
+#![allow(warnings)]
 extern crate hyper;
 extern crate serialize;
 extern crate url;
