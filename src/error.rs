@@ -6,7 +6,7 @@ use std::fmt;
 pub enum ClientError {
   HostNotFound(String),
   InvalidHostname,
-  CircuitClosed,
+  CircuitOpen,
   RequestTimeout,
   HttpClientError,
 }
@@ -22,7 +22,7 @@ impl Error for ClientError {
     match *self {
       ClientError::HostNotFound(_) => "Host Not Found",
       ClientError::InvalidHostname => "Invalid Hostname",
-      ClientError::CircuitClosed => "Circuit is Closed",
+      ClientError::CircuitOpen => "Circuit is Open",
       ClientError::RequestTimeout => "Request timed out",
       ClientError::HttpClientError => "Http Client Error",
     }

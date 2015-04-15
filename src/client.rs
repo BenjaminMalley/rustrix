@@ -41,7 +41,7 @@ impl Client {
         return Err(box error::ClientError::HostNotFound(host));
       }
     };
-    if circuit.is_open() {
+    if circuit.is_closed() {
       let (tx, rx) = channel();
       thread::spawn(move || {
         let mut client = client::Client::new();
@@ -65,7 +65,7 @@ impl Client {
           };
         },
         _ = timeout.recv() => {
-          circuit.close();
+          circuit.open();
           let mut cloned_circuits = self.circuits.clone();
           thread::spawn(move || {
             let mut client = client::Client::new();
@@ -78,7 +78,7 @@ impl Client {
                 Ok(_) => {
                   let mut c = cloned_circuits.lock().unwrap();
                   let mut circuit = c.get_mut(&host).unwrap();
-                  circuit.open();
+                  circuit.close();
                   break;
                 },
               }
@@ -88,16 +88,16 @@ impl Client {
         }
       }
     } else {
-      return Err(box error::ClientError::CircuitClosed);
+      return Err(box error::ClientError::CircuitOpen);
     }
   }
 
-  pub fn is_open(&mut self, host: &str) -> Option<bool> {
+  pub fn is_closed(&mut self, host: &str) -> Option<bool> {
     let mut circuits = self.circuits.clone();
     let c = circuits.lock().unwrap();
     match c.get(host) {
       None => None,
-      Some(circuit) => Some(circuit.open)
+      Some(circuit) => Some(circuit.closed)
     }
   }
 }

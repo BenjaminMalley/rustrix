@@ -1,24 +1,24 @@
 pub struct Circuit {
-  pub open: bool,
+  pub closed: bool,
 }
 
 impl Circuit {
   pub fn new() -> Circuit {
     Circuit{
-      open: true,
+      closed: true,
     }
   }
 
   pub fn close(&mut self) {
-    self.open = false;
+    self.closed = true;
   }
 
   pub fn open(&mut self) {
-    self.open = true;
+    self.closed = false;
   }
 
-  pub fn is_open(&self) -> bool {
-    self.open
+  pub fn is_closed(&self) -> bool {
+    self.closed
   }
 }
 
