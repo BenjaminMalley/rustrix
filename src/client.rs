@@ -1,6 +1,5 @@
 #![feature(box_syntax)]
 extern crate hyper;
-use std::collections::BTreeMap;
 use circuit;
 use std::error::Error;
 use hyper::client;
@@ -9,29 +8,34 @@ use std::time::duration::Duration;
 use std::thread;
 use std::sync::mpsc::channel;
 use std::old_io::timer::Timer;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 pub struct Client {
-  circuits: BTreeMap<String, circuit::Circuit>,
+  circuits: Arc<Mutex<HashMap<String, circuit::Circuit>>>,
   timeout: Duration,
 }
 
 impl Client {
   pub fn new() -> Client {
     Client{
-      circuits: BTreeMap::new(),
+      circuits: Arc::new(Mutex::new(HashMap::new())),
       timeout: Duration::milliseconds(500),
     }
   }
 
   pub fn get(&mut self, url: &str) -> Result<hyper::client::response::Response, Box<Error>> {
     let valid_url = try!(client::IntoUrl::into_url(url));
+    let cloned_url = valid_url.clone();
     let host = match valid_url.host() {
       Some(host) => host.serialize(),
       None => {
         return Err(box error::ClientError::InvalidHostname);
       }
     };
-    let mut circuit = match self.circuits.get_mut(&host) {
+    let mut circuits = self.circuits.clone();
+    let mut c = circuits.lock().unwrap();
+    let mut circuit = match c.get_mut(&host) {
       Some(circuit) => circuit,
       None => {
         return Err(box error::ClientError::HostNotFound(host));
@@ -62,6 +66,24 @@ impl Client {
         },
         _ = timeout.recv() => {
           circuit.close();
+          let mut cloned_circuits = self.circuits.clone();
+          thread::spawn(move || {
+            let mut client = client::Client::new();
+            let periodic = timer.periodic(Duration::milliseconds(100));
+            loop {
+              periodic.recv();
+              let request = client.get(cloned_url.clone());
+              match request.send() {
+                Err(_) => continue,
+                Ok(_) => {
+                  let mut c = cloned_circuits.lock().unwrap();
+                  let mut circuit = c.get_mut(&host).unwrap();
+                  circuit.open();
+                  break;
+                },
+              }
+            }
+          });
           return Err(box error::ClientError::RequestTimeout);
         }
       }
@@ -71,7 +93,9 @@ impl Client {
   }
 
   pub fn is_open(&mut self, host: &str) -> Option<bool> {
-    match self.circuits.get(host) {
+    let mut circuits = self.circuits.clone();
+    let c = circuits.lock().unwrap();
+    match c.get(host) {
       None => None,
       Some(circuit) => Some(circuit.open)
     }
